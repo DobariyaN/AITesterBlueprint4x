@@ -53,6 +53,9 @@ AI-powered test automation blueprint.
     - [The five stages](#the-five-stages)
     - [The step everyone skips](#the-step-everyone-skips)
     - [Running it two ways](#running-it-two-ways)
+  - [Chapter 11: RAG Implementation](#chapter-11-rag-implementation)
+    - [Two workflows, one lesson](#two-workflows-one-lesson)
+    - [Why one document per row](#why-one-document-per-row)
 - [License](#license)
 
 ## Overview
@@ -1505,6 +1508,107 @@ hosted build bakes the chunk vectors at build time and embeds the query client-s
 > excerpts do not contain any information about pricing"* instead of inventing a number.
 > That comes from one line in the system prompt in `server/app.py`, not from the model
 > being careful. Delete the line and it will happily make something up.
+
+### Chapter 11: RAG Implementation
+
+**Concept:** naive RAG built on hosted infrastructure instead of local parts: a CSV of
+100 Jira test cases goes into a **Pinecone** index through OpenAI embeddings, and an n8n
+AI Agent queries it as a retrieval tool.
+
+**Why:** chapter 10 explains the mechanics on a single 7-page PRD. This chapter moves to a
+corpus that is awkward in the way real corpora are awkward, a hundred short near-identical
+records, and that awkwardness changes how you have to chunk.
+
+```
+chapter_11_RAG_Implementation/00_NAIVE_RAG/
+├── Prompt.md                                       # the thread that generated the corpus
+├── data/Wingify_Login_100_Jira_Test_Cases.csv      # 100 cases, 18 fields, ~30k words
+└── n8n/
+    ├── 01_Naive_RAG.json                           # 15 nodes: blind text splitting
+    └── 01_Naive_RAG - Complete Test Cases.json     # 20 nodes: one document per row
+```
+
+The corpus is evenly spread across six categories at 10 cases each (Authentication, Email
+validation, Password and boundaries, Navigation and usability, Password recovery, Sessions
+and Remember me), 56 negative scenarios to 44 positive.
+
+Stack: Pinecone index `airagnew`, namespace `wingify-login-v2`, embeddings from
+`text-embedding-3-large`, answers from `gpt-5-mini`.
+
+#### Two workflows, one lesson
+
+Both files have the same two halves: a form upload that ingests, and a chat trigger whose
+agent retrieves. The difference is entirely in how the CSV becomes documents.
+
+```mermaid
+flowchart LR
+    F["Form upload<br/>Testcase Path"] --> V1{"How does the CSV<br/>become documents?"}
+    V1 -->|"01_Naive_RAG<br/>15 nodes"| SPL["Recursive Character<br/>Text Splitter, defaults"]
+    V1 -->|"01_Naive_RAG -<br/>Complete Test Cases<br/>20 nodes"| EX["Extract CSV Rows<br/>enableBOM: true"]
+    EX --> BLD["Build Test Case Documents<br/>one doc per row + metadata"]
+    BLD --> LOOP["Loop One Test Case"]
+    SPL --> PC[("Pinecone<br/>airagnew / wingify-login-v2")]
+    LOOP --> PC
+    C["Chat trigger"] --> AG["AI Agent<br/>gpt-5-mini"]
+    AG -->|retrieval tool| PC
+    PC --> AG
+    AG --> ANS["Grounded answer"]
+
+    classDef src fill:#57606a,stroke:#24292f,color:#fff
+    classDef ai fill:#1f6feb,stroke:#0b3d91,color:#fff
+    classDef gate fill:#bf8700,stroke:#7a5600,color:#fff
+    classDef out fill:#2da44e,stroke:#0f5323,color:#fff
+    class F,C src
+    class AG ai
+    class V1,SPL,EX,BLD,LOOP gate
+    class PC,ANS out
+```
+
+#### Why one document per row
+
+A test case is already a self-contained unit of about 765 characters. Turn the whole CSV
+into one text blob and let a character splitter cut it every N characters, and the cuts
+land mid-case: half of TC-014's expected result gets glued to the start of TC-015's
+preconditions. The embedding for that fragment describes nothing real, and retrieval
+returns it for neither case.
+
+So the second workflow never splits text. It builds one document per row and attaches the
+row's own fields as Pinecone metadata:
+
+```js
+// Build Test Case Documents - strips the BOM, then keeps each case whole
+const fields = ['Test Case ID', 'Summary', 'Category', 'Scenario Type', 'Priority',
+  'Preconditions', 'Test Data', 'Test Steps', 'Expected Result',
+  'Execution Status', 'Assumptions / Applicability'];
+
+return $input.all().map((item) => {
+  // Excel writes a UTF-8 BOM, so the first header is "﻿Test Case ID"
+  const row = Object.fromEntries(
+    Object.entries(item.json).map(([k, v]) => [k.replace(/^﻿/, '').trim(), v])
+  );
+  return { json: {
+    text: fields.map((f) => `${f}: ${row[f] ?? ''}`).join('\n'),
+    tc_id: row['Test Case ID'],
+    category: row['Category'],
+    scenario_type: row['Scenario Type'],
+    priority: row['Priority'],
+  }};
+});
+```
+
+That metadata is the payoff. Once `category` and `scenario_type` are on every vector, you
+can filter before you rank, which is what saves you when a hundred records all share the
+same vocabulary.
+
+**Q&A - why use this?**
+- **Q: When do I reach for Pinecone over the local Chroma in chapter 10?** A: When the index has to outlive the process and be reachable from somewhere that is not your laptop. Chapter 10's Chroma file is perfect for one machine and useless to an n8n cloud workflow, which is exactly why this chapter switched.
+- **Q: What does one-document-per-row replace?** A: The default Recursive Character Text Splitter, which is the right tool for prose and the wrong tool for records. If your rows are already atomic, splitting by character count can only damage them.
+- **Q: What's the gotcha?** A: **A hundred near-identical records is the hard case for retrieval.** Every row says login, password, email, sign in, so the vectors cluster tightly and similarity scores compress into a narrow band where top-k barely discriminates. This is the point where metadata filtering, reranking, or hybrid keyword-plus-vector search stop being optional. Naive RAG is the baseline here, not the destination.
+
+> **The CSV has a UTF-8 BOM.** The first column reads as `﻿"Test Case ID"`, so
+> `row["Test Case ID"]` throws a `KeyError` against a header that looks perfectly correct
+> in every editor. Both workflows handle it, `Extract CSV Rows` with `enableBOM: true` and
+> the Code node with `replace(/^﻿/, '')`. In Python it is `encoding="utf-8-sig"`.
 
 ## License
 
