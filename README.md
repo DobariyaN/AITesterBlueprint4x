@@ -60,6 +60,7 @@ AI-powered test automation blueprint.
     - [Five decisions](#five-decisions)
     - [Hybrid retrieval, measured](#hybrid-retrieval-measured)
     - [Top-k cannot prove absence](#top-k-cannot-prove-absence)
+  - [Chapters 13-21: coming next](#chapters-13-21-coming-next)
 - [License](#license)
 
 ## Overview
@@ -1736,6 +1737,46 @@ that **none of the 70 A/B testing cases are automated**.
 > function, labelled as such in the UI. The DigitalOcean deployment (Docker Compose plus
 > Caddy for HTTPS and a login) is in [`deploy/DEPLOY.md`](chapter_12_RAG_QA_BuddyAI/deploy/DEPLOY.md):
 > written, not yet run end to end.
+
+What is left: [`Todo_List.md`](chapter_12_RAG_QA_BuddyAI/Todo_List.md) is the phase roadmap
+(auto-ingestion, caching, pipeline tests, cloud deployment, then Figma and screenshots), and
+[`PENDING_TASKS.md`](chapter_12_RAG_QA_BuddyAI/PENDING_TASKS.md) breaks the open work into 24
+prioritised tasks, each with a "done when".
+
+### Chapters 13-21: coming next
+
+The folders are in place (each holds a `.gitkeep` until its content lands). After RAG, the
+course moves to giving LLMs tools (MCP), then the agent frameworks, then measuring whether any
+of it works.
+
+```mermaid
+flowchart LR
+    RAG["Ch 10-12<br/>RAG"] --> MCP["Ch 13-14<br/>MCP"]
+    MCP --> PY["Ch 15<br/>Python + PyTest"]
+    PY --> AG["Ch 16-18<br/>Agent frameworks"]
+    AG --> EV["Ch 19-21<br/>LLM evaluation"]
+
+    classDef src fill:#57606a,stroke:#24292f,color:#fff
+    classDef ai fill:#1f6feb,stroke:#0b3d91,color:#fff
+    classDef gate fill:#bf8700,stroke:#7a5600,color:#fff
+    classDef out fill:#2da44e,stroke:#0f5323,color:#fff
+    class RAG src
+    class MCP,AG ai
+    class PY gate
+    class EV out
+```
+
+| Chapter | Topic | Folder |
+|---|---|---|
+| 13 | MCP Basics | `chapter_13_MCP_Basics/` |
+| 14 | MCP Create VIBE | `chapter_14_MCP_Create_VIBE/` |
+| 15 | Python and PyTest | `chapter_15_Python_PyTest/` |
+| 16 | AI Agents with CrewAI | `chapter_16_AI_Agent_Crew_AI/` |
+| 17 | AI Agents with LangChain | `chapter_17_AI_Agent_LangChain/` |
+| 18 | AI Agents with LangGraph | `chapter_18_AI_Agent_LangGraph/` |
+| 19 | LLM Evaluation | `chapter_19_LLM_Eval/` |
+| 20 | DeepEval Basics | `chapter_20_DeepEval_Basics/` |
+| 21 | DeepEval Framework | `chapter_21_DeepEval_Framework/` |
 
 ## License
 
