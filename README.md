@@ -60,6 +60,9 @@ AI-powered test automation blueprint.
     - [Five decisions](#five-decisions)
     - [Hybrid retrieval, measured](#hybrid-retrieval-measured)
     - [Top-k cannot prove absence](#top-k-cannot-prove-absence)
+  - [Chapter 13: MCP Basics](#chapter-13-mcp-basics)
+    - [Tools, resources and prompts](#tools-resources-and-prompts)
+    - [25+ MCP ideas for QA](#25-mcp-ideas-for-qa)
   - [Chapter 14: MCP Servers by Vibe Coding](#chapter-14-mcp-servers-by-vibe-coding)
     - [Data first, then tools](#data-first-then-tools)
     - [The 21 tools](#the-21-tools)
@@ -68,7 +71,10 @@ AI-powered test automation blueprint.
     - [TestSkill Finder MCP: 100 QA skills for any LLM](#testskill-finder-mcp-100-qa-skills-for-any-llm)
     - [How skill search works](#how-skill-search-works)
     - [Files in this chapter](#files-in-this-chapter)
-  - [Chapters 13 and 15-21: coming next](#chapters-13-and-15-21-coming-next)
+  - [Chapter 15: Python and PyTest](#chapter-15-python-and-pytest)
+    - [The exercises so far](#the-exercises-so-far)
+    - [Identifier rules](#identifier-rules)
+  - [Chapters 16-21: coming next](#chapters-16-21-coming-next)
 - [License](#license)
 
 ## Overview
@@ -1751,6 +1757,81 @@ What is left: [`Todo_List.md`](chapter_12_RAG_QA_BuddyAI/Todo_List.md) is the ph
 [`PENDING_TASKS.md`](chapter_12_RAG_QA_BuddyAI/PENDING_TASKS.md) breaks the open work into 24
 prioritised tasks, each with a "done when".
 
+### Chapter 13: MCP Basics
+
+**Concept:** MCP (Model Context Protocol) is an open standard that connects AI applications
+(Claude Code, Codex, Cursor, Windsurf, Kiro) to external systems (Jira, Slack, Playwright,
+Selenium, GitHub, databases). An **MCP server** exposes tools, resources and prompts once, and
+every MCP-capable app can use them.
+
+**Why:** an LLM on its own is only a brain with knowledge. An AI agent is brain + memory +
+tools, and MCP is how it gets the tools without a custom integration for every app and every
+system.
+
+The class notes are in [`MCP_Inspector.md`](chapter_13_MCP_Basics/MCP_Inspector.md): MCP vs API,
+the host/client/server roles, how to install the Playwright MCP, two ways to build your own
+(vibe coding with prompts, or Python with FastMCP), the TestCreator MCP plan, and 25+ MCP ideas.
+
+```mermaid
+flowchart LR
+    subgraph HOST["MCP host: Claude Code, Cursor, VS Code"]
+        LLM["LLM<br/>the brain"] --> CL["MCP client<br/>1:1 per server"]
+    end
+    CL --> S["MCP server"]
+    S --> T["Tools<br/>verbs, like POST"]
+    S --> R["Resources<br/>nouns, like GET"]
+    S --> P["Prompts<br/>reusable recipes"]
+    T --> EXT["External systems<br/>Playwright, Jira, DB"]
+
+    classDef src fill:#57606a,stroke:#24292f,color:#fff
+    classDef ai fill:#1f6feb,stroke:#0b3d91,color:#fff
+    classDef gate fill:#bf8700,stroke:#7a5600,color:#fff
+    classDef out fill:#2da44e,stroke:#0f5323,color:#fff
+    class LLM ai
+    class CL,S gate
+    class T,R,P ai
+    class EXT out
+```
+
+#### Tools, resources and prompts
+
+| Primitive | Think of it as | Example | API analogy |
+|---|---|---|---|
+| Tool | A verb the agent executes | create a Jira issue, run a test, click a button | POST |
+| Resource | A read-only noun for context | a file list, today's test plan, a style guide | GET |
+| Prompt | A reusable recipe on the server | `/test-review`, `/bug-triage` with arguments | none, user-triggered |
+
+The fastest way to feel MCP is to add an existing server. The Playwright MCP gives an AI a real
+browser:
+
+```bash
+# Claude Code
+claude mcp add playwright -- npx @playwright/mcp@latest
+```
+
+```jsonc
+// .vscode/mcp.json (VS Code)
+{
+  "servers": {
+    "playwright": { "type": "stdio", "command": "npx", "args": ["@playwright/mcp@latest"] }
+  }
+}
+```
+
+#### 25+ MCP ideas for QA
+
+The notes list 25 servers worth building, in three groups:
+- **Manual tester wins:** test case generator, test repository search, bug report writer, requirement ambiguity checker, test data factory.
+- **Automation tester wins:** flaky test intelligence, failure RCA, locator healer, API contract server, test impact analysis.
+- **Team-level servers:** a test management bridge across TestRail, Zephyr, Xray and Qase; QA metrics; a shared QA prompt library.
+
+Chapter 14 builds two of them.
+
+**Q&A - why use this?**
+- **Q: Why MCP and not just an API?** A: An API is for programs you write against it. MCP is for AI apps: one server works in Claude Code, Cursor and Codex unchanged, and the model discovers what it can do from the tool descriptions.
+- **Q: Should my feature be a tool, a resource or a prompt?** A: A tool if it does something, a resource if it only provides context to read, a prompt if it is a recipe a person starts on purpose.
+- **Q: What's the gotcha?** A: The model chooses tools by reading their names and descriptions. Vague or overlapping tools make it pick the wrong one, so tool design matters as much as the code behind it.
+
 ### Chapter 14: MCP Servers by Vibe Coding
 
 This chapter builds two MCP servers by talking to Claude Code, from first prompt to pushed code:
@@ -2023,9 +2104,80 @@ above are pinned in tests, so a change to the scoring that breaks them fails the
 | [`assets/`](chapter_14_MCP_Create_VIBE/assets/) | Three hand-drawn images rendered with Codex, with the briefs used to render them |
 | [`learnings/2026-10-10-skill-library-mcp.md`](learnings/2026-10-10-skill-library-mcp.md) | How the skill finder was built: parallel writers, golden queries, sync safety |
 
-### Chapters 13 and 15-21: coming next
+### Chapter 15: Python and PyTest
 
-Chapter 14 has landed (above). The other folders are in place, each holding a `.gitkeep`
+**Concept:** Python foundations for testers, as small numbered scripts you run one by one:
+printing, comments, keywords, identifiers, literals, variables, dynamic typing and simple math,
+before moving on to PyTest.
+
+**Why:** everything from here on (FastMCP in chapter 14, CrewAI, LangChain, LangGraph, DeepEval)
+is Python, so the basics have to be automatic first.
+
+```bash
+cd chapter_15_Python_PyTest
+python3 ex_01_Python_Basics/003_PrintCommand.py
+```
+
+#### The exercises so far
+
+| Folder | Scripts | Covers |
+|---|---|---|
+| [`ex_01_Python_Basics/`](chapter_15_Python_PyTest/ex_01_Python_Basics/) | 001-003 | `print()`, comments, `sep` and `end` |
+| [`ex_02_Keywords_Identifier_Literals/`](chapter_15_Python_PyTest/ex_02_Keywords_Identifier_Literals/) | 004-015 | keywords (`keyword.kwlist`), identifiers, variables, `type()`, dynamic typing, complex numbers, multiple assignment, operator precedence (BODMAS), `max()`/`min()`, string + int |
+
+```mermaid
+flowchart LR
+    A["ex_01<br/>print, comments,<br/>sep and end"] --> B["ex_02<br/>keywords, identifiers,<br/>literals, variables"]
+    B --> C["Dynamic typing<br/>type()"]
+    C --> D["Next: PyTest"]
+
+    classDef src fill:#57606a,stroke:#24292f,color:#fff
+    classDef ai fill:#1f6feb,stroke:#0b3d91,color:#fff
+    classDef out fill:#2da44e,stroke:#0f5323,color:#fff
+    class A,B src
+    class C ai
+    class D out
+```
+
+Three ideas from the scripts, with the output they really print:
+
+```python
+# 003_PrintCommand.py: sep joins the values, end replaces the newline
+print("Hello", "World", "TheTestingAcademy", sep="*")   # Hello*World*TheTestingAcademy
+print("*", "*", sep="-", end="\t")                      # *-*  then a tab, no newline
+print("*", "*", sep="_")                                # *_*  on the same line
+
+# 008_Dynamic_Tye.py: a name can point to any type; type() shows the current one
+age = 98
+print(type(age))        # <class 'int'>
+age = "Pramod"
+print(type(age))        # <class 'str'>
+
+# 015_IQ.py: str + int is an error, convert first
+# print("Hello" + 15)   # TypeError: can only concatenate str (not "int") to str
+print("Hello" + str(15))  # Hello15
+```
+
+`013_MathIQ.py` ends with `"PRAMOD" + 10 + 20` on purpose, to show that `TypeError`.
+
+#### Identifier rules
+
+[`00_RULE.md`](chapter_15_Python_PyTest/ex_02_Keywords_Identifier_Literals/00_RULE.md) covers the
+7 rules plus PEP 8 naming:
+- Use only letters, digits and `_`, and never start with a digit.
+- A name can't be a keyword, and names are case sensitive.
+- There's no length limit, and `_` on its own is a valid name.
+- Don't shadow built-ins such as `list`.
+- Use `snake_case` for variables, `UPPER_SNAKE_CASE` for constants and `PascalCase` for classes.
+
+**Q&A - why use this?**
+- **Q: Why can `age` hold 98 and then "Pramod"?** A: Python is dynamically typed. A variable is just a name for the last value assigned, and `type()` tells you what it holds right now.
+- **Q: How do I know if a name is allowed?** A: Letters, digits and underscore, not starting with a digit, and not a keyword. `keyword.iskeyword("class")` returns `True`, so `class_name` is the usual workaround.
+- **Q: What's the gotcha?** A: Python never converts types for you in `+`. `"PRAMOD" + 10` raises `TypeError`, so convert with `str()` first. Naming a variable `list` also silently breaks `list()` for the rest of the file.
+
+### Chapters 16-21: coming next
+
+Chapters 13-15 have landed (above). The other folders are in place, each holding a `.gitkeep`
 until its content lands. After RAG, the course moves to giving LLMs tools (MCP), then the agent frameworks, then measuring whether any
 of it works.
 
@@ -2048,8 +2200,6 @@ flowchart LR
 
 | Chapter | Topic | Folder |
 |---|---|---|
-| 13 | MCP Basics | `chapter_13_MCP_Basics/` |
-| 15 | Python and PyTest | `chapter_15_Python_PyTest/` |
 | 16 | AI Agents with CrewAI | `chapter_16_AI_Agent_Crew_AI/` |
 | 17 | AI Agents with LangChain | `chapter_17_AI_Agent_LangChain/` |
 | 18 | AI Agents with LangGraph | `chapter_18_AI_Agent_LangGraph/` |
